@@ -1,0 +1,77 @@
+{"properties": [
+  {
+    "name": "application.db-encryption-password-for-strings",
+    "type": "java.lang.String",
+    "description": "Password for encrypting text in db"
+  },
+  {
+    "name": "application.db-encryption-password-for-bytes",
+    "type": "java.lang.String",
+    "description": "Password for encrypting blobs in db"
+  },
+  {
+    "name": "application.remote-cert-lookup",
+    "type": "java.lang.Boolean",
+    "description": "A flag if a remote certificate lookup is enabled"
+  },
+  {
+    "name": "application.kms-type",
+    "type": "java.lang.String",
+    "description": "A KMS implementation to be used: local|remote"
+  },
+  {
+    "name": "application.certificate-dn-template",
+    "type": "java.lang.String",
+    "description": "A template sting for DN in generated certificate"
+  },
+  {
+    "name": "application.fortanix-trust-store-type",
+    "type": "java.lang.String",
+    "description": "Keystore type holding Fortanix HTTP public certificate"
+  },
+  {
+    "name": "application.fortanix-trust-store-path",
+    "type": "java.lang.String",
+    "description": "Path to keystore holding Fortanix HTTP public certificate"
+  },
+  {
+    "name": "application.fortanix-trust-store-password",
+    "type": "java.lang.String",
+    "description": "Password to keystore holding Fortanix HTTP public certificate"
+  },
+  {
+    "name": "application.fortanix-username",
+    "type": "java.lang.String",
+    "description": "Fortanix REST API username"
+  },
+  {
+    "name": "application.fortanix-password",
+    "type": "java.lang.String",
+    "description": "Fortanix REST API password"
+  },
+  {
+    "name": "application.fortanix-url",
+    "type": "java.lang.String",
+    "description": "Fortanix REST API URL"
+  },
+  {
+    "name": "application.built-in-cert-mapping",
+    "type": "java.lang.String",
+    "description": "A cert mapping that must always exit in db in format <signingKeyIdSrc>=<signingKeyIdDst or certDn>"
+  },
+  {
+    "name": "application.certificate-key-size",
+    "type": "java.lang.String",
+    "description": "Key size to be used by a signing certificate: 2048 by default"
+  },
+  {
+    "name": "application.certificate-hash-type",
+    "type": "java.lang.String",
+    "description": "Signature hash type to be used by a signing certificate: SHA256withRSA by default"
+  },
+  {
+    "name": "application.access-tokens",
+    "type": "java.lang.String",
+    "description": "HTTP Basic Auth sha256 hashes, comma separated"
+  }
+]}

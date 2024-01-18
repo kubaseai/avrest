@@ -1,0 +1,164 @@
+<html>
+<head>
+<style>
+body { font-family: Calibri, Arial;  background-image: url('bg.png'); border: 0; margin: 0px;}
+form { padding-bottom: 20px; }
+input { margin: 2px; display: inline-block; }
+label {
+    display: inline-block;
+    width: 150px;
+    text-align: right;
+}
+textarea {
+    display: none;
+}
+pre { 
+    outline: 1px solid #ccc;
+    padding: 5px; margin: 5px;
+    display: none;
+}
+h1 {
+    color: rgb(1,130,129);
+}
+.string { color: green; }
+.number { color: navy; }
+.boolean { color: blue; }
+.null { color: magenta; }
+.key { color: rgb(0,0,128); }
+
+</style>
+<script>
+async function postData(url = '', data = {}, method = 'POST') {
+  console.log('HTTP '+method+' to '+url);
+  // Default options are marked with *
+  const response = await fetch(url, {
+    method: method, // *GET, POST, PUT, DELETE, etc.
+    mode: 'same-origin', // no-cors, *cors, same-origin
+    cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+    credentials: 'same-origin', // include, *same-origin, omit
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    redirect: 'follow', // manual, *follow, error
+    referrerPolicy: 'no-referrer', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+    body: JSON.stringify(data) // body data type must match "Content-Type" header
+  });
+  return response.json(); // parses JSON response into native JavaScript objects
+}
+
+async function getData(url = '') {
+	  console.log('HTTP GET to '+url);
+	  // Default options are marked with *
+	  const response = await fetch(url, {
+	    method: 'GET', // *GET, POST, PUT, DELETE, etc.
+	    mode: 'same-origin', // no-cors, *cors, same-origin
+	    cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+	    credentials: 'same-origin', // include, *same-origin, omit
+	    headers: {
+	      'Accept': 'application/json'
+	    },
+	    redirect: 'follow', // manual, *follow, error
+	    referrerPolicy: 'no-referrer', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+	  });
+	  return response.json(); // parses JSON response into native JavaScript objects
+	}
+
+
+function verifyHash() {
+	var hash = document.getElementById('hash').value;
+	getData('/rest/api/1.0/av-scan/files/by-hash/'+hash)
+	.then(data => {
+		var ta = document.getElementById('verification-response');
+		ta.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+		ta.style.display = "inline-block";
+		console.log("HTTP REST response is below:");
+		console.log(data);
+		var validCnt = 0;
+		for (var i=0; i < data.length; i++) {
+			if (data[i].status == "clean") validCnt++;
+		}
+		if (validCnt == data.length && validCnt > 0) {
+			ta.style.border="2px solid green";
+		}
+		else {
+			ta.style.border="2px solid red";
+		}		
+	});
+	return false;	
+}
+
+function verifyId() {
+	var id = document.getElementById('file-id').value;
+	getData('/rest/api/1.0/av-scan/files/'+id)
+	.then(data => {
+		var ta = document.getElementById('verification-response-2');
+		ta.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+		ta.style.display = "inline-block";
+		console.log("HTTP REST response is below:");
+		console.log(data);
+		var validCnt = 0;
+		for (var i=0; i < data.length; i++) {
+			if (data[i].status == "clean") validCnt++;
+		}
+		if (validCnt == data.length && validCnt > 0) {
+			ta.style.border="2px solid green";
+		}
+		else {
+			ta.style.border="2px solid red";
+		}		
+	});
+	return false;	
+}
+
+function syntaxHighlight(json) {
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        var cls = 'number';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                cls = 'key';
+            } else {
+                cls = 'string';
+            }
+        } else if (/true|false/.test(match)) {
+            cls = 'boolean';
+        } else if (/null/.test(match)) {
+            cls = 'null';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+    });
+}
+
+</script>
+</head>
+<body>
+<div style="width: 95%; opacity: 0.9; background-color: white; order: 0; margin: 0; padding: 30px 30px 30px 30px;">
+<h1>Anti-Virus REST Service</h1>
+<span><a href="/swagger-ui/index.html?configUrl=/v3/api-docs/swagger-config#">API definition</a></span>
+
+<form action="/rest/api/1.0/av-scan/files/file" enctype="multipart/form-data" method="post">
+<h2>Scan uploaded file</h2>
+<label>Select file:</label><input type="file" name="file"/><br/>
+<input type="submit"/>
+</form>
+
+<form action="/rest/api/1.0/av-scan/files/" method="post">
+<h2>Verify the signature for the given id</h2>
+<label>id:</label><input id="file-id" name="file-id" type="text"/><br/>
+<input type="submit" onclick="verifyId(); return false;"/>
+<br/>
+<pre id="verification-response-2"></pre>
+</form>
+
+<form action="/rest/api/1.0/av-scan/files/by-hash/" method="post">
+<h2>Verify the signature for the given hash</h2>
+<label>hash:</label><input id="hash" name="hash" type="text"/><br/>
+<input type="submit" onclick="verifyHash(); return false;"/>
+<br/>
+<pre id="verification-response"></pre>
+</form>
+
+</div>
+</body>
+</html>
