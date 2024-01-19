@@ -119,6 +119,7 @@ public class Http11IcapOutputBuffer implements HttpOutputBuffer {
      */
     protected String protocol;
     protected String verb;
+    protected long contentLengthForChunk = 0;
 
 
     protected Http11IcapOutputBuffer(Response response, int headerBufferSize) {
@@ -392,7 +393,7 @@ public class Http11IcapOutputBuffer implements HttpOutputBuffer {
             case 401:
                 return "Authorization required as X-ICAP-Authorization";
             case 403:
-                return "Permission denied";
+                return "Forbidden. Infected and not repaired.";
             case 404:
                 return "Not found";
             case 405:
@@ -432,6 +433,13 @@ public class Http11IcapOutputBuffer implements HttpOutputBuffer {
         else {
             log.debug("Not sending hdr "+name);
         }
+        if (hdrName.equals("content-length")) {
+            String hdrVal = value.toString();
+            try {
+                contentLengthForChunk = Long.parseLong(hdrVal);
+            }
+            catch (Exception e) {}
+        }
     }
 
 
@@ -440,6 +448,8 @@ public class Http11IcapOutputBuffer implements HttpOutputBuffer {
      */
     public void endHeaders() {
         headerBuffer.put(Constants.CR).put(Constants.LF);
+        String chunkInfo = Long.toHexString(contentLengthForChunk) + "\r\n\r\n";
+        headerBuffer.put(chunkInfo.getBytes());
     }
 
 

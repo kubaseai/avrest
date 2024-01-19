@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>av-rest</groupId>
 	<artifactId>api-av</artifactId>
-	<version>0.9</version>
+	<version>0.10</version>
 	<name>service</name>
 	<description>AV REST Service</description>
 

@@ -3,10 +3,17 @@ package io.github.kubaseai.av.service.impl;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 
+import org.bouncycastle.util.encoders.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
 import io.github.kubaseai.av.model.FileRecord;
 import io.github.kubaseai.av.model.FileRecord.FileRecordType;
 
@@ -16,6 +23,7 @@ public class ScanStrategyRealTime extends ScanStrategy {
 
 	private final static String EICAR_PART_1 = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-";
 	private final static String EICAR_PART_2 = "ANTIVIRUS-TEST-FILE!$H+H*";
+	private final static String EICAR_SHA512 = sha512((EICAR_PART_1 + EICAR_PART_2).getBytes());
 
 	private FileRecord writeAntiVirusTestFile(File f) {
 		try (RandomAccessFile out = new RandomAccessFile(f, "rw")) {
@@ -26,8 +34,25 @@ public class ScanStrategyRealTime extends ScanStrategy {
 		}
 		catch (Exception e) {}
 		FileRecord fr = new FileRecord();
+		fr.setId("av-test-file");
+		fr.setName("eicar.com");
+		fr.setSource("avrest-svc");
+		fr.setSha512(EICAR_SHA512);
+		fr.setSize(68);
 		fr.setLocalFile(f);
 		return fr;
+	}
+
+	private static String sha512(byte[] bytes) {
+		MessageDigest md;
+		try {
+			md = MessageDigest.getInstance("SHA-512");
+			md.update(bytes);
+			return Hex.toHexString(md.digest());
+		}
+		catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	@Override
@@ -56,6 +81,7 @@ public class ScanStrategyRealTime extends ScanStrategy {
 			file.setStatus(FileRecordType.infected);
 		}
 		file.setAnalyzedAt(new Date());
+		file.markProcessingEnd();
 		logger.info("File analysis finished: "+file);
 	}
 }

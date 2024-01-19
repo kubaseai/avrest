@@ -88,6 +88,7 @@ public class AvScanningService {
 			catch (Exception e) {
 				logger.error("Scanning failed for "+file, e);
 				file.setStatus(FileRecordType.failure);
+				file.markProcessingEnd();
 			}
 			finally {
 				repo.save(file);

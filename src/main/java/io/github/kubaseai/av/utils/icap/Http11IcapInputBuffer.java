@@ -140,8 +140,9 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
     private final HeaderParseData headerData = new HeaderParseData();
     private final HttpParser httpParser;
     private boolean isIcap = false;
-    private boolean icapOptionsSeen = false;
+    private boolean expectedIcapEnapsulatedBody = false;
 
+   
     /**
      * Maximum allowed size of the HTTP request line plus headers plus any leading blank lines.
      */
@@ -284,6 +285,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
         // action when parsing input data is to read one of these volatiles.
         parsingRequestLine = true;
         parsingHeader = true;
+        isIcap = false;
     }
 
 
@@ -328,6 +330,10 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
         return HttpParser.isHttpProtocol(chr) || (char)chr=='I' || (char)chr == 'C' || (char)chr == 'A';
     }
 
+    private boolean isIcapFileScanRequest() {
+        return "RESPMOD".equals(request.method().toString()) || "RESPMOD".equals(request.getAttribute("X-ICAP"));
+    }
+
     /**
      * Read the request line. This function is meant to be used during the HTTP request header parsing. Do NOT attempt
      * to read the request body using it.
@@ -342,6 +348,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
         log.debug("Parse request line");
         // check state
         if (!parsingRequestLine) {
+            isIcap = "ICAP/1.0".equals(request.protocol().toString());
             return true;
         }
         //
@@ -356,7 +363,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
                         // timeout.
                         wrapper.setReadTimeout(keepAliveTimeout);
                     }
-                    if (!fill(false)) {
+                    if (!fill("parseRequestLine-1", false)) {
                         // A read is pending, so no longer in initial state
                         parsingRequestLinePhase = 1;
                         return false;
@@ -399,7 +406,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
             while (!space) {
                 // Read new bytes if needed
                 if (byteBuffer.position() >= byteBuffer.limit()) {
-                    if (!fill(false)) {
+                    if (!fill("parseRequestLine-2", false)) {
                         return false;
                     }
                 }
@@ -412,9 +419,8 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
                     request.method().setBytes(byteBuffer.array(), parsingRequestLineStart,
                             pos - parsingRequestLineStart);
                     String verb = request.method().toString();
-                    icapOptionsSeen = isIcap && verb.equals("OPTIONS");
                     if (isIcap) {
-                        if (!icapOptionsSeen)
+                        if (!"OPTIONS".equals(request.method().toString()))
                             request.method().setString("POST");
                         request.setAttribute("X-ICAP", verb);
                     }
@@ -433,7 +439,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
             while (space) {
                 // Read new bytes if needed
                 if (byteBuffer.position() >= byteBuffer.limit()) {
-                    if (!fill(false)) {
+                    if (!fill("parseRequestLine-3", false)) {
                         return false;
                     }
                 }
@@ -457,7 +463,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
             while (!space) {
                 // Read new bytes if needed
                 if (byteBuffer.position() >= byteBuffer.limit()) {
-                    if (!fill(false)) {
+                    if (!fill("parseRequestLine-4", false)) {
                         return false;
                     }
                 }
@@ -529,7 +535,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
             while (space) {
                 // Read new bytes if needed
                 if (byteBuffer.position() >= byteBuffer.limit()) {
-                    if (!fill(false)) {
+                    if (!fill("parseRequestLine-5", false)) {
                         return false;
                     }
                 }
@@ -553,7 +559,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
             while (!parsingRequestLineEol) {
                 // Read new bytes if needed
                 if (byteBuffer.position() >= byteBuffer.limit()) {
-                    if (!fill(false)) {
+                    if (!fill("parseRequestLine-6", false)) {
                         return false;
                     }
                 }
@@ -599,7 +605,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
         int start = byteBuffer.position();
         while (true) {
             if (byteBuffer.position() >= byteBuffer.limit()) {
-                if (!fill(block)) {
+                if (!fill("readLine", block)) {
                     return null;
                 }
             }
@@ -629,19 +635,29 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
     }
 
     boolean parseHeaders() throws IOException {
-        boolean status = _parseHeaders();
-        if (isIcap && !icapOptionsSeen) {
+        boolean status = true;
+        if (!expectedIcapEnapsulatedBody) {
+            status = _parseHeaders();
+        }
+        if (isIcap && isIcapFileScanRequest()) {
             String httpLine = readLine(byteBuffer, false);
             if (httpLine!=null) {
+                log.debug("ICAP request line is: '"+httpLine+"'");
                 if (!httpLine.startsWith("HTTP/1.")) {
                     throw new IOException("Unexpected content instead of http line: "+httpLine);
                 }
-                log.debug("ICAP request line is: '"+httpLine+"'");
                 prepareForRepeatedHeaderParsing();
                 _parseHeaders();
                 // specified by ICAP protocol, added here for dummy HTTP compatibility
-                headers.addValue(Constants.TRANSFERENCODING).setString("Chunked");
-            }            
+                request.setContentLength(-1);
+                headers.removeHeader("content-length");
+                headers.addValue(Constants.TRANSFERENCODING).setString(Constants.CHUNKED);
+                expectedIcapEnapsulatedBody = false;
+            }
+            else {
+                expectedIcapEnapsulatedBody = true;
+                return false;
+            }      
         }
         String icapAuthz = headers.getHeader("X-ICAP-Authorization");
         String auth = headers.getHeader("Authorization");
@@ -721,6 +737,8 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
      */
     void endRequest() throws IOException {
 
+        log.debug("end request, swallow="+swallowInput);
+
         if (swallowInput && (lastActiveFilter != -1)) {
             int extraBytes = (int) activeFilters[lastActiveFilter].end();
             byteBuffer.position(byteBuffer.position() - extraBytes);
@@ -760,7 +778,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
         // 2. wrapper.hasDataToRead() is present to handle the NIO2 case
         try {
             if (available == 0 && read && !byteBuffer.hasRemaining() && wrapper.hasDataToRead()) {
-                fill(false);
+                fill("available", false);
                 available = byteBuffer.remaining();
             }
         } catch (IOException ioe) {
@@ -812,6 +830,10 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
         return false;
     }
 
+    boolean isIcapChunkingActive() {
+        return isIcap && lastActiveFilter > -1 && 
+            activeFilters[lastActiveFilter] == filterLibrary[Constants.CHUNKED_FILTER];
+    }
 
     void init(SocketWrapperBase<?> socketWrapper) {
 
@@ -833,13 +855,16 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
      *
      * @return <code>true</code> if more data was added to the input buffer otherwise <code>false</code>
      */
-    private boolean fill(boolean block) throws IOException {
+    private boolean fill(String reason, boolean block) throws IOException {
 
         if (log.isDebugEnabled()) {
-            log.debug("Before fill(): parsingHeader: [" + parsingHeader + "], parsingRequestLine: [" +
-                    parsingRequestLine + "], parsingRequestLinePhase: [" + parsingRequestLinePhase +
-                    "], parsingRequestLineStart: [" + parsingRequestLineStart + "], byteBuffer.position(): [" +
-                    byteBuffer.position() + "], byteBuffer.limit(): [" + byteBuffer.limit() + "], end: [" + end + "]");
+            String reqInfo = "protocol: ["+request.protocol()+"], method: ["+request.method()+"], isIcap: ["+isIcap+"], "+
+                "isIcapFileScanRequest: ["+isIcapFileScanRequest()+"]";
+            log.debug("Before fill() for "+reason+": parsingHeader: [" + parsingHeader + "], parsingRequestLine: [" +
+                parsingRequestLine + "], parsingRequestLinePhase: [" + parsingRequestLinePhase +
+                "], parsingRequestLineStart: [" + parsingRequestLineStart + "], byteBuffer.position(): [" +
+                byteBuffer.position() + "], byteBuffer.limit(): [" + byteBuffer.limit() + "], end: [" + end + "], "+
+                reqInfo);
         }
 
         if (parsingHeader) {
@@ -888,7 +913,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
         }
 
         if (log.isDebugEnabled()) {
-            log.debug("Received [" + new String(byteBuffer.array(), byteBuffer.position(), byteBuffer.remaining(),
+            log.debug("Received for "+reason+"[" + new String(byteBuffer.array(), byteBuffer.position(), byteBuffer.remaining(),
                     StandardCharsets.UTF_8) + "]");
         }
 
@@ -921,7 +946,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
 
             // Read new bytes if needed
             if (byteBuffer.position() >= byteBuffer.limit()) {
-                if (!fill(false)) {
+                if (!fill("parseHeader-1", false)) {
                     return HeaderParseStatus.NEED_MORE_DATA;
                 }
             }
@@ -962,7 +987,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
 
             // Read new bytes if needed
             if (byteBuffer.position() >= byteBuffer.limit()) {
-                if (!fill(false)) { // parse header
+                if (!fill("parseHeader-2", false)) { // parse header
                     return HeaderParseStatus.NEED_MORE_DATA;
                 }
             }
@@ -1020,7 +1045,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
                 while (true) {
                     // Read new bytes if needed
                     if (byteBuffer.position() >= byteBuffer.limit()) {
-                        if (!fill(false)) {// parse header
+                        if (!fill("parseHeader-3", false)) {// parse header
                             // HEADER_VALUE_START
                             return HeaderParseStatus.NEED_MORE_DATA;
                         }
@@ -1046,7 +1071,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
 
                     // Read new bytes if needed
                     if (byteBuffer.position() >= byteBuffer.limit()) {
-                        if (!fill(false)) {// parse header
+                        if (!fill("parseHeader-4", false)) {// parse header
                             // HEADER_VALUE
                             return HeaderParseStatus.NEED_MORE_DATA;
                         }
@@ -1085,7 +1110,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
             }
             // Read new bytes if needed
             if (byteBuffer.position() >= byteBuffer.limit()) {
-                if (!fill(false)) {// parse header
+                if (!fill("parseHeader-5", false)) {// parse header
                     // HEADER_MULTI_LINE
                     return HeaderParseStatus.NEED_MORE_DATA;
                 }
@@ -1142,7 +1167,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
 
             // Read new bytes if needed
             if (byteBuffer.position() >= byteBuffer.limit()) {
-                if (!fill(false)) {
+                if (!fill("skipLine", false)) {
                     return HeaderParseStatus.NEED_MORE_DATA;
                 }
             }
@@ -1273,7 +1298,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
             if (byteBuffer.position() >= byteBuffer.limit()) {
                 // The application is reading the HTTP request body
                 boolean block = (request.getReadListener() == null);
-                if (!fill(block)) {
+                if (!fill("doRead", block)) {
                     if (block) {
                         return -1;
                     } else {

@@ -160,7 +160,9 @@ public class AvScanningRestService {
 			byte[] buff = new byte[4096];
 			FileChannel ch = out.getChannel();
 			int n = 0;
+			long bytesRead = 0;
 			while ((n = is.read(buff)) > 0) {
+				bytesRead += n;
 				md.update(buff, 0, n);
 				out.write(buff, 0, n);
 				if (out.length() > cfg.getMaxFileSize()) {
@@ -174,10 +176,8 @@ public class AvScanningRestService {
 			fileInfo.setSha512(hash);
 			fileInfo.setQueuedAt(new Date());
 			fileInfo.setStatus(FileRecordType.accepted);
+			fileInfo.setSize(bytesRead);
 			ch.force(true);
-			fileInfo.setSize(out.length());
-//			SecurityContext ctx = SecurityContextHolder.getContext();
-//			Authentication auth = ctx!=null ? ctx.getAuthentication() : null;
 			fileInfo.setSource(getSource(req));
 			svc.queueFileForScanning(fileInfo);
 			fileInfo.waitForCallback(waitMillis!=null ? waitMillis : 0L);
@@ -214,7 +214,7 @@ public class AvScanningRestService {
 			map.put("X-Infection-Found", List.of("Type=0; Resolution=2; Threat=infected;"));
 			map.put("X-Virus-ID", List.of(fileInfo.getId()));
 			map.put("X-Response-Desc", List.of("File was deleted by AV"));
-			return new ResponseEntity<>(map, HttpStatus.NOT_ACCEPTABLE);
+			return new ResponseEntity<>(map, HttpStatus.FORBIDDEN);
 		}	
 		return new ResponseEntity<>(map, fileInfo.getHttpStatus());
 	}

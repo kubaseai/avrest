@@ -442,6 +442,9 @@ public class Http11IcapProcessor extends AbstractProcessor {
                 // If this is an async request then the request ends when it has
                 // been completed. The AsyncContext is responsible for calling
                 // endRequest() in that case.
+                if (inputBuffer.isIcapChunkingActive()) {
+                    // keepAlive = false;                                     
+                }
                 endRequest();
             }
             rp.setStage(org.apache.coyote.Constants.STAGE_ENDOUTPUT);
@@ -643,6 +646,8 @@ public class Http11IcapProcessor extends AbstractProcessor {
      */
     @SuppressWarnings("deprecation")
     private void prepareRequest() throws IOException {
+
+        log.debug("Prepare request");
 
         if (protocol.isSSLEnabled()) {
             request.scheme().setString("https");
@@ -1265,6 +1270,7 @@ public class Http11IcapProcessor extends AbstractProcessor {
      * depending on the error and expectation status.
      */
     private void endRequest() {
+        log.debug("end request");
         if (getErrorState().isError()) {
             // If we know we are closing the connection, don't drain
             // input. This way uploading a 100GB file doesn't tie up the

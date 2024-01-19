@@ -120,6 +120,6 @@ public class FileRecord {
 	}
 
     public void markProcessingEnd() {
-        this.callback.offer(new Object());
+        this.callback.add(new Object());
     }
 }
