@@ -448,8 +448,11 @@ public class Http11IcapOutputBuffer implements HttpOutputBuffer {
      */
     public void endHeaders() {
         headerBuffer.put(Constants.CR).put(Constants.LF);
-        String chunkInfo = Long.toHexString(contentLengthForChunk) + "\r\n\r\n";
-        headerBuffer.put(chunkInfo.getBytes());
+        boolean isIcap = "ICAP/1.0".equals(protocol);
+        if (isIcap) {
+            String chunkInfo = Long.toHexString(contentLengthForChunk) + "\r\n\r\n";
+            headerBuffer.put(chunkInfo.getBytes());
+        }
     }
 
 

@@ -1,13 +1,16 @@
 package io.github.kubaseai.av.config;
 
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 import org.apache.catalina.connector.Connector;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.security.web.firewall.StrictHttpFirewall;
 
 // TODO: https://techdocs.broadcom.com/us/en/symantec-security-software/endpoint-security-and-management/symantec-protection-engine/9-1-0/SPE-Docker-Containers/how-to-scan-files-using-icap.html
 
@@ -58,5 +61,12 @@ public class IcapConfig implements WebServerFactoryCustomizer<TomcatServletWebSe
             return new ClassPathResource(file.substring(10)).getPath();
         }
         return Paths.get(file).toFile().getAbsolutePath();
+    }
+
+    @Bean
+    public StrictHttpFirewall httpFirewall() {
+        StrictHttpFirewall firewall = new StrictHttpFirewall();
+        firewall.setAllowedHttpMethods(Arrays.asList("HEAD", "DELETE", "POST", "GET", "OPTIONS", "PATCH", "PUT", "RESPMOD"));
+        return firewall;
     }
 }

@@ -418,12 +418,7 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
                     space = true;
                     request.method().setBytes(byteBuffer.array(), parsingRequestLineStart,
                             pos - parsingRequestLineStart);
-                    String verb = request.method().toString();
-                    if (isIcap) {
-                        if (!"OPTIONS".equals(request.method().toString()))
-                            request.method().setString("POST");
-                        request.setAttribute("X-ICAP", verb);
-                    }
+                    wrapIcapMethod();
                 } else if (!HttpParser.isToken(chr)) {
                     // Avoid unknown protocol triggering an additional error
                     request.protocol().setString(PROT_ICAP);
@@ -600,6 +595,16 @@ public class Http11IcapInputBuffer implements InputBuffer, ApplicationBufferHand
         }
         throw new IllegalStateException(sm.getString("iib.invalidPhase", Integer.valueOf(parsingRequestLinePhase)));
     }
+
+    public void wrapIcapMethod() {
+        String verb = request.method().toString();
+        if (isIcap) {
+            if (!"OPTIONS".equals(verb))
+                request.method().setString("POST");
+            request.setAttribute("X-ICAP", verb);
+        }
+    }
+
 
     private String readLine(ByteBuffer byteBuffer, boolean block) throws IOException {
         int start = byteBuffer.position();

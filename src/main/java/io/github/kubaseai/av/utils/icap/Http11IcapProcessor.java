@@ -402,6 +402,7 @@ public class Http11IcapProcessor extends AbstractProcessor {
                     log.debug("Service call: "+request.protocol()+" "+request.method().toString()+" "+request.requestURI());
                     outputBuffer.setProtocol(request.protocol().getString());
                     outputBuffer.setVerb(request.method().toString());
+                    inputBuffer.wrapIcapMethod();
                     getAdapter().service(request, response);
                     // Handle when the response was committed before a serious
                     // error occurred. Throwing a ServletException should both
