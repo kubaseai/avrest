@@ -41,6 +41,7 @@ public class AvScanningService {
 			wd = "./";
 		}
 		workingDir = Paths.get(wd);
+		scanner.setDeepScan(cfg.getDeepScan());
 	}
 	
 	private final static Logger logger = LoggerFactory.getLogger(AvScanningService.class);

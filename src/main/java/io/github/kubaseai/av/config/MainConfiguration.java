@@ -18,7 +18,16 @@ public class MainConfiguration {
 	private long maxFileSize = 30*1024*1024;
 	private int threadPoolSize = 16;
 	private String avScannerCommand;
+	private int deepScan = 1;
 	
+	public int getDeepScan() {
+		return deepScan;
+	}
+
+	public void setDeepScan(int deepScan) {
+		this.deepScan = deepScan;
+	}
+
 	public String getAccessTokens() {
 		return accessTokens;
 	}

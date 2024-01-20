@@ -119,6 +119,17 @@
 	    		<artifactId>bcpg-jdk18on</artifactId>
 	    		<version>1.77</version>
 		</dependency>
+	
+		<dependency>
+			<groupId>javax</groupId>
+			<artifactId>javaee-api</artifactId>
+			<version>8.0.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.glassfish</groupId>
+			<artifactId>javax.json</artifactId>
+			<version>1.1.4</version>
+		</dependency>
 	</dependencies>	
 
 	<build>

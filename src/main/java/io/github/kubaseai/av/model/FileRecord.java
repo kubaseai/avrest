@@ -41,6 +41,7 @@ public class FileRecord {
 	@JsonIgnore
 	private transient File localFile;
 	private String source;
+	private String typeFromContent;
 	private transient LinkedBlockingQueue<Object> callback = new LinkedBlockingQueue<Object>();
 	
 	public String getId() {
@@ -101,7 +102,7 @@ public class FileRecord {
 		this.callback.poll(millis, TimeUnit.MILLISECONDS);
 	}
 	public String toString() {
-	        return "FileInfo { id="+id+", name="+name+", hash="+sha512+", size="+size+", queuedAt="+queuedAt+", analyzedAt="+analyzedAt+", status="+status+", localPath="+localFile.getAbsolutePath()+", source="+source+" }";
+	        return "FileInfo { id="+id+", name="+name+", hash="+sha512+", size="+size+", queuedAt="+queuedAt+", analyzedAt="+analyzedAt+", status="+status+", localPath="+localFile.getAbsolutePath()+", source="+source+", typeFromContent='"+typeFromContent+"' }";
 	}
 	public HttpStatus getHttpStatus() {
 		if (FileRecordType.accepted.equals(status)) {
@@ -122,4 +123,10 @@ public class FileRecord {
     public void markProcessingEnd() {
         this.callback.add(new Object());
     }
+    public void setTypeFromContent(String t) {
+        this.typeFromContent = t;
+    }
+	public String getTypeFromContent() {
+		return typeFromContent;
+	}
 }

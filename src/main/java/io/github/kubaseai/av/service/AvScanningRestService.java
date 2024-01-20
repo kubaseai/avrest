@@ -1,11 +1,13 @@
 package io.github.kubaseai.av.service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.http.HttpHeaders;
 import java.io.InputStream;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.channels.FileChannel;
@@ -46,6 +48,8 @@ import io.github.kubaseai.av.config.MainConfiguration;
 import io.github.kubaseai.av.model.FileRecord;
 import io.github.kubaseai.av.model.FileRecord.FileRecordType;
 import io.github.kubaseai.av.service.impl.AvScanningService;
+import io.github.kubaseai.av.service.impl.ScanStrategy;
+import io.github.kubaseai.av.service.impl.ScanStrategyRealTime;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.info.Info;
@@ -161,7 +165,12 @@ public class AvScanningRestService {
 			FileChannel ch = out.getChannel();
 			int n = 0;
 			long bytesRead = 0;
+			ByteArrayOutputStream guessFileTypeStream = new ByteArrayOutputStream();
 			while ((n = is.read(buff)) > 0) {
+				if (n > 0) {
+					if (guessFileTypeStream.size()< 1024)
+						guessFileTypeStream.write(buff, 0, n);
+				}
 				bytesRead += n;
 				md.update(buff, 0, n);
 				out.write(buff, 0, n);
@@ -177,13 +186,30 @@ public class AvScanningRestService {
 			fileInfo.setQueuedAt(new Date());
 			fileInfo.setStatus(FileRecordType.accepted);
 			fileInfo.setSize(bytesRead);
-			ch.force(true);
+			ScanStrategy.guessFileType(guessFileTypeStream.toByteArray(), fileInfo);
+			try {
+				ch.force(true);
+			}
+			catch (Exception e) {
+				RuntimeException toRethrow = null;
+				try {
+					FileStore fs = Files.getFileStore(f.toPath());
+					if (fs.isReadOnly() || fs.getUsableSpace() == 0) {
+						toRethrow = new RuntimeException("File write error", e);
+					}
+				}
+				catch (Exception ex) {}
+				if (toRethrow!=null)
+					throw toRethrow;
+			}
 			fileInfo.setSource(getSource(req));
 			svc.queueFileForScanning(fileInfo);
 			fileInfo.waitForCallback(waitMillis!=null ? waitMillis : 0L);
 			return new ResponseEntity<>(fileInfo, HttpStatus.ACCEPTED);
 		}
 	}
+
+	
 
 	@Secured("ROLE_USER")
 	@RequestMapping(value = "/icap/{name}", 
